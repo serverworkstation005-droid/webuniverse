@@ -1,0 +1,25 @@
+const fs = require('fs');
+const path = 'src/components/DirectoryLayout.tsx';
+let content = fs.readFileSync(path, 'utf8');
+
+// Replace PortalLogo return block
+content = content.replace(
+  /<div className="w-full h-full relative flex items-center justify-center shrink-0">\s*<div className="absolute inset-0 bg-white\/10 blur-\[15px\] rounded-full group-hover:bg-indigo-500\/40 group-hover:blur-\[20px\] transition-all duration-500 opacity-80" \/>\s*<div className="w-full h-full flex items-center justify-center bg-gradient-to-b from-white\/15 to-white\/5 border border-white\/20 shadow-xl rounded-2xl relative overflow-hidden transition-all duration-300 group-hover:scale-110 p-3 z-10">[\s\S]*?<\/div>\s*<\/div>/g,
+  `<div className="w-full h-full relative flex items-center justify-center shrink-0 transition-all duration-500 z-10">\n      {!isFailedAll && displayUrl && (\n        <>\n          {/* Low-resolution blur-up placeholder for progressive loading sequence */}\n          {!isLoaded && (\n             <img \n               src={displayUrl.includes('google.com') ? displayUrl.replace('sz=128', 'sz=16') : displayUrl.includes('clearbit.com') ? \`\${displayUrl}?size=16\` : displayUrl}\n               alt=""\n               aria-hidden="true"\n               className="absolute inset-0 w-full h-full object-contain filter blur-[8px] scale-110 opacity-60 pointer-events-none"\n             />\n          )}\n          <img \n            src={displayUrl} \n            alt={name} \n            referrerPolicy="no-referrer"\n            loading="eager"\n            fetchPriority="high"\n            onError={handleError}\n            onLoad={handleLoad}\n            className={\`w-full h-full p-2 object-contain relative z-10 transition-all duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] drop-shadow-md logo-img opacity-100 scale-100\`} \n          />\n        </>\n      )}\n      {isFailedAll && (\n        <div className="absolute inset-0 z-0 flex items-center justify-center">\n          {Placeholder}\n        </div>\n      )}\n    </div>`
+);
+
+// Replace PortalCard return block
+const startPortalCard = content.indexOf('<a\n          href={portal.url}');
+const endPortalCard = content.indexOf('</a>', startPortalCard) + 4;
+const replacementPortalCard = `<a\n          href={portal.url}\n          target="_blank"\n          rel="noopener noreferrer"\n          onClick={(e) => e.stopPropagation()}\n          className="block w-full h-full outline-none"\n        >\n          <div className="backdrop-blur-2xl bg-[#0a0a0c]/80 rounded-[20px] p-4 flex flex-col items-center justify-between group transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] border border-white/5 relative isolate gpu-layer hover:bg-white/[0.03] shadow-inner hover:shadow-[0_0_40px_rgba(99,102,241,0.15)] h-full min-h-[160px] overflow-hidden hover:scale-[1.03] hover:-translate-y-1">\n            <div className="absolute top-3 left-3 px-2 py-0.5 rounded-full border border-indigo-500/20 bg-indigo-500/10 text-indigo-300 text-[8px] md:text-[9px] font-bold tracking-widest uppercase pointer-events-none z-20">\n              TRUSTED\n            </div>\n            <div className="absolute top-3 right-3 text-white/20 group-hover:text-amber-400 transition-colors duration-300 pointer-events-none z-20">\n               <Star size={14} className="fill-transparent group-hover:fill-amber-400/20 transition-all" />\n            </div>\n            \n            <div className="w-full h-20 sm:h-24 relative shrink-0 flex items-center justify-center mt-6 mb-3 z-10 group-hover:scale-110 transition-transform duration-500 ease-[cubic-bezier(0.25,1,0.5,1)]">\n              <PortalLogo domain={portal.domain} name={portal.name} categoryId={categoryId} customLogo={portal.logo} />\n            </div>\n\n            <div className="min-w-0 w-full flex flex-col items-center justify-center mt-auto z-20">\n              <span className="flex items-center gap-1.5 text-[10px] sm:text-xs font-mono text-white/40 group-hover:text-white/70 transition-colors truncate">\n                <ExternalLink size={10} className="shrink-0" />\n                <span className="truncate">{portal.domain}</span>\n              </span>\n            </div>\n          </div>\n        </a>`;
+content = content.substring(0, startPortalCard) + replacementPortalCard + content.substring(endPortalCard);
+
+
+// Replace Skeleton
+const startSkeleton = content.indexOf('<div className="glass-card rounded-[22px]');
+const endSkeleton = content.indexOf('</div>\n      )}', startSkeleton) + 6;
+const replacementSkeleton = `<div className="backdrop-blur-2xl bg-[#0a0a0c]/80 rounded-[20px] sm:p-5 flex flex-col items-center justify-center border border-white/[0.05] animate-pulse h-full min-h-[160px]">\n          <div className="w-full h-16 rounded-xl bg-white/5 shrink-0" />\n        </div>`;
+content = content.substring(0, startSkeleton) + replacementSkeleton + content.substring(endSkeleton);
+
+fs.writeFileSync(path, content);
+console.log('Fixed DirectoryLayout.tsx styling');
