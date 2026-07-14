@@ -1,0 +1,2 @@
+Error: Command failed: git log -p -5 src/pages/SmartSearch.tsx
+fatal: not a git repository (or any of the parent directories): .git

@@ -1,0 +1,642 @@
+144-  const [isLoaded, setIsLoaded] = useState(() => {
+145-    if (customLogo && customLogo.startsWith("/logos/")) return false;
+146-    const lastWorkingUrl =
+147-      verifiedLogoCache.get(domain) ||
+148-      (typeof window !== "undefined"
+149-        ? localStorage.getItem(`logo-url:${domain}`)
+150-        : null);
+151-    if (lastWorkingUrl) {
+152-      return inlineMemoryCache.has(lastWorkingUrl);
+153-    }
+154-    return false;
+155-  });
+156-
+157-  const inViewRef = useRef<HTMLDivElement>(null);
+158-  const isInView = useInView(inViewRef, { once: true, margin: "150px" });
+159-  const shouldLoad = priority || isInView || isLoaded || !!persistedDataUrl;
+160-
+161-  // Check IndexedDB persistent cache on load
+162-  useEffect(() => {
+163-    if (!shouldLoad) return;
+164-    let isCancelled = false;
+165-    async function loadLogoFromCache() {
+166-      try {
+167-        if (customLogo && customLogo.startsWith("/logos/")) return;
+168-        const lastWorkingUrl =
+169-          verifiedLogoCache.get(domain) ||
+170-          localStorage.getItem(`logo-url:${domain}`);
+171-        if (!lastWorkingUrl) return;
+172-
+173-        // Skip async lookups if already matched in synchronous memory
+174-        if (inlineMemoryCache.has(lastWorkingUrl)) {
+175-          setPersistedDataUrl(inlineMemoryCache.get(lastWorkingUrl)!);
+176-          setIsLoaded(true);
+177-          return;
+178-        }
+179-
+180-        const cachedBase64 = await getCachedImage(lastWorkingUrl);
+181-        if (isCancelled) return;
+182-
+183-        if (cachedBase64) {
+184-          setPersistedDataUrl(cachedBase64);
+185-          setIsLoaded(true);
+186-        }
+187-      } catch (err) {
+188-        // Fallback to normal loading if IndexedDB fails or is blocked
+189-      }
+190-    }
+191-
+192-    loadLogoFromCache();
+193-
+194:    return () => {
+195-      isCancelled = true;
+196-    };
+197-  }, [domain]);
+198-
+199-  const initials = useMemo(() => {
+200-    return name
+201-      .split(/[\s-_]+/)
+202-      .filter(Boolean)
+203-      .map((word) => word[0])
+204-      .join("")
+205-      .toUpperCase()
+206-      .slice(0, 2);
+207-  }, [name]);
+208-
+209-  // Make an elegant, premium, animated monogram as the alternate logo fallback
+210-  const Placeholder = useMemo(() => {
+211-    // Premium dynamic mesh gradient fallback
+212:    return (
+213-      <motion.div
+214-        initial={{ opacity: 0 }}
+215-        animate={{ opacity: 1 }}
+216-        transition={{ type: "spring", stiffness: 110, damping: 20, mass: 1 }}
+217-        className="w-full h-full flex items-center justify-center relative overflow-hidden rounded-2xl group/placeholder"
+218-      >
+219-        {/* Mesh Gradient Background */}
+220-        <div className="absolute inset-0 bg-gradient-to-br from-[#1a103c] via-[#09090b] to-[#1e102f] z-0" />
+221-        <div className="absolute top-[-50%] left-[-50%] w-[200%] h-[200%] opacity-40 mix-blend-screen bg-[radial-gradient(ellipse_at_center,rgba(99,102,241,0.25)_0%,transparent_50%)] animate-[spin_10s_linear_infinite]" />
+222-        <div className="absolute bottom-[-50%] right-[-50%] w-[200%] h-[200%] opacity-30 mix-blend-screen bg-[radial-gradient(ellipse_at_center,rgba(236,72,153,0.25)_0%,transparent_50%)] animate-[spin_15s_linear_infinite_reverse]" />
+223-
+224-        {/* Inner glow & border */}
+225-        <div className="absolute inset-0 shadow-[inset_0_0_20px_rgba(255,255,255,0.05)] border border-white/5 rounded-2xl z-10" />
+226-
+227-        {/* Text */}
+228-        <div className="relative z-20 flex items-center justify-center">
+229-          <span className="text-4xl sm:text-5xl font-black font-sans tracking-tighter text-transparent bg-clip-text bg-gradient-to-b from-white via-white to-white/50 drop-shadow-[0_0_15px_rgba(255,255,255,0.4)] uppercase select-none transition-transform duration-[950ms]">
+230-            {initials ? initials[0] : "?"}
+231-          </span>
+232-        </div>
+233-      </motion.div>
+234-    );
+235-  }, [initials]);
+236-
+237-  const handleLoad = () => {
+238-    setIsLoaded(true);
+239-    // If loaded from network and not dynamic IndexedDB Base64 data, store the working URL
+240-    if (!persistedDataUrl && loadStep >= 0 && loadStep < sources.length) {
+241-      const workingUrl = sources[loadStep];
+242-      verifiedLogoCache.set(domain, workingUrl);
+243-      try {
+244-        localStorage.setItem(`logo-url:${domain}`, workingUrl);
+245-      } catch (e) {}
+246-      saveImageToCache(workingUrl).catch(() => {});
+247-    }
+248-  };
+249-
+250-  const handleError = () => {
+251-    setIsLoaded(false);
+252-    if (persistedDataUrl) {
+253-      setPersistedDataUrl(null);
+254-      setLoadStep(0);
+255-    } else if (loadStep >= 0 && loadStep < sources.length) {
+256-      failedLogoCache.add(sources[loadStep]);
+257-      setLoadStep((prev) => prev + 1);
+258-    } else if (loadStep === -1) {
+259-      // If cached URL fails, remove from cache and retry standard list
+260-      verifiedLogoCache.delete(domain);
+261-      try {
+262-        localStorage.removeItem(`logo-url:${domain}`);
+263-      } catch (e) {}
+264-      setLoadStep(0);
+265-    }
+266-  };
+267-
+268-  const sourceUrl =
+269-    loadStep === -1 ? verifiedLogoCache.get(domain) : sources[loadStep];
+270-  const displayUrl = persistedDataUrl || sourceUrl;
+271-  const isFailedAll = persistedDataUrl ? false : loadStep >= sources.length;
+272-
+273:  return (
+274-    <div ref={inViewRef} className="w-full h-full relative flex items-center justify-center shrink-0 transition-opacity duration-[950ms] z-10">
+275-      <AnimatePresence mode="wait">
+276-        {!isFailedAll && displayUrl && shouldLoad ? (
+277-          <>
+278-            <motion.img
+279-              key={displayUrl}
+280-              initial={{ opacity: 0 }}
+281-              animate={{ opacity: isLoaded ? 1 : 0 }}
+282-              exit={{ opacity: 0 }}
+283-              transition={{ type: "spring", stiffness: 110, damping: 20, mass: 1 }}
+284-              src={displayUrl}
+285-              alt={name}
+286-              referrerPolicy="no-referrer"
+287-              loading="lazy"
+288-              decoding="async"
+289-              onError={handleError}
+290-              onLoad={handleLoad}
+291-              style={{
+292-                ...getSmartFitStyles("logo") }}
+293-              className={`w-full h-full max-w-full max-h-full relative z-10`}
+294-            />
+295-            
+296-          </>
+297-        ) : isFailedAll ? (
+298-          <motion.div
+299-            key="placeholder"
+300-            initial={{ opacity: 0 }}
+301-            animate={{ opacity: 1 }}
+302-            exit={{ opacity: 0 }}
+303-            transition={{ type: "spring", stiffness: 110, damping: 20, mass: 1 }}
+304-            className="absolute inset-0 z-0 flex items-center justify-center transform-gpu"
+305-          >
+306-            {Placeholder}
+307-          </motion.div>
+308-        ) : null}
+309-      </AnimatePresence>
+310-    </div>
+311-  );
+312-});
+313-
+314-export const PortalCard = memo(function PortalCard({
+315-  portal,
+316-  categoryId,
+317-  onSelect,
+318-  index = 0,
+319-  priority = false }: {
+320-  portal: Portal;
+321-  categoryId: string;
+322-  onSelect?: (portal: Portal) => void;
+323-  index?: number;
+324-  priority?: boolean;
+325-}) {
+326-  const categoryTag = useMemo(() => {
+327-    const rawType = (portal.type || categoryId || "").toLowerCase();
+328-    if (
+329-      rawType.includes("movie") ||
+330-      rawType.includes("stream") ||
+331-      rawType.includes("video")
+332-    )
+333-      return "Movies";
+334-    if (rawType.includes("game") || rawType.includes("play")) return "Games";
+335-    if (
+336-      rawType.includes("software") ||
+337-      rawType.includes("app") ||
+338-      rawType.includes("apk") ||
+339-      rawType.includes("os")
+340-    )
+341-      return "Software";
+342-    if (rawType.includes("anime") || rawType.includes("manga")) return "Anime";
+343-    if (rawType.includes("book")) return "Books";
+344-    if (rawType.includes("torrent")) return "Torrents";
+345-    return rawType.toUpperCase() || "WEB";
+346-  }, [portal.type, categoryId]);
+347-
+348-  const cardRef = React.useRef<HTMLAnchorElement>(null);
+349-  const [copied, setCopied] = React.useState(false);
+350-
+351-  function handleMouseMove({ clientX, clientY }: React.MouseEvent) {
+352-    if (!cardRef.current) return;
+353-    window.requestAnimationFrame(() => {
+354-      if (!cardRef.current) return;
+355-      const { left, top, width, height } = cardRef.current.getBoundingClientRect();
+356-      const x = clientX - left;
+357-      const y = clientY - top;
+358-      cardRef.current.style.setProperty('--mouse-x', `${x}px`);
+359-      cardRef.current.style.setProperty('--mouse-y', `${y}px`);
+360-    });
+361-  }
+362-
+363:  return (
+364-    <motion.a
+365-      href={portal.url}
+366-      target="_blank"
+367-      rel="noopener noreferrer"
+368-      onClick={(e) => {
+369-        if (onSelect) {
+370-          e.preventDefault();
+371-          e.stopPropagation();
+372-          onSelect(portal as any);
+373-        } else {
+374-          e.stopPropagation();
+375-        }
+376-      }}
+377-      onMouseMove={handleMouseMove}
+378-      variants={{
+379-        hidden: { opacity: 0, scale: 0.9, y: 30 },
+380-        visible: { 
+381-          opacity: 1, 
+382-          scale: 1,
+383-          y: 0,
+384-          transition: { type: "spring", stiffness: 100, damping: 20, mass: 0.8, delay: (index % 12) * 0.05 }
+385-        }
+386-      }}
+387-      initial="hidden"
+388-      whileInView="visible"
+389-      viewport={{ once: true, margin: "-50px" }}
+390-      exit={{ opacity: 0 }}
+391-      whileHover={{ scale: 1.05, y: -12, zIndex: 50, transition: { type: "spring", stiffness: 150, damping: 22, mass: 0.8 } }}
+392-      whileTap={{ scale: 0.98, transition: { type: "spring", stiffness: 150, damping: 15, mass: 1 } }}
+393-      style={{ WebkitMaskImage: "-webkit-radial-gradient(white, black)" }}
+394-      className="group block relative w-full aspect-[2/1] min-h-[120px] sm:min-h-[130px] md:min-h-[140px] outline-none rounded-3xl overflow-hidden isolate will-change-[transform,opacity] transform-gpu"
+395-    >
+396-      <div
+397-        className="pointer-events-none absolute -inset-px rounded-3xl opacity-0 transition duration-[950ms] group-hover:opacity-100 z-10"
+398-        style={{
+399-          background: `radial-gradient(150px circle at var(--mouse-x, 0) var(--mouse-y, 0), rgba(168, 85, 247, 0.10), transparent 80%)` }}
+400-      />
+401-      <div
+402-        className="pointer-events-none absolute inset-0 rounded-3xl opacity-0 transition duration-[950ms] group-hover:opacity-100 z-50"
+403-        style={{
+404-          boxShadow: `inset 0 0 0 1px radial-gradient(150px circle at var(--mouse-x, 0) var(--mouse-y, 0), rgba(192, 132, 252, 0.3), transparent 50%)` }}
+405-      />
+406-      <div className="absolute inset-0 bg-white/[0.03] bg-gradient-to-br from-white/[0.06] to-transparent shadow-[inset_0_1px_1px_rgba(255,255,255,0.15),0_8px_32px_rgba(0,0,0,0.5)] rounded-3xl p-2 flex flex-col items-center justify-center transition-all duration-[950ms] ease-[cubic-bezier(0.16,1,0.3,1)] border border-white/10 group-hover:border-white/30 group-hover:from-white/[0.1] group-hover:to-white/[0.01] relative isolate h-full overflow-hidden">
+407-        {/* Hardware accelerated shadow */}
+408-        <div className="absolute inset-0 rounded-3xl shadow-[inset_0_1px_2px_rgba(255,255,255,0.3),0_12px_40px_rgba(0,0,0,0.6)] opacity-0 group-hover:opacity-100 transition-opacity duration-[950ms] pointer-events-none" />
+409-        <div className="absolute inset-0 bg-gradient-to-br from-white/[0.08] to-transparent opacity-0 group-hover:opacity-100 transition-[opacity] duration-[950ms] ease-[cubic-bezier(0.16,1,0.3,1)] pointer-events-none" />
+410-        <div className="absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-white/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-[950ms]" />
+411-
+412-        <div className="absolute top-2 right-2 flex items-center gap-1.5 z-30 opacity-0 group-hover:opacity-100 transition-opacity duration-[950ms]">
+413-          <button
+--
+415-              e.preventDefault();
+416-              e.stopPropagation();
+417-              navigator.clipboard.writeText(portal.url);
+418-              setCopied(true);
+419-              if (window.navigator?.vibrate) window.navigator.vibrate(50);
+420-              setTimeout(() => setCopied(false), 2000);
+421-            }}
+422-            className="p-1.5 rounded-full bg-black/20 hover:bg-white/15 text-white/50 hover:text-white transition-colors touch-manipulation"
+423-            title="Copy URL"
+424-          >
+425-            {copied ? <Check size={14} className="text-emerald-400" /> : <Copy size={14} />}
+426-          </button>
+427-        </div>
+428-        
+429-        <div className="flex-1 min-h-0 flex items-center justify-center relative w-full p-2 overflow-visible transition-all duration-[950ms] ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:-translate-y-2 group-hover:scale-[1.02]">
+430-          <PortalLogo
+431-            domain={portal.domain}
+432-            name={portal.name}
+433-            customLogo={portal.logo}
+434-            categoryId={categoryId}
+435-            priority={priority}
+436-          />
+437-        </div>
+438-
+439-        <div className="flex flex-col items-center justify-center w-full z-20 shrink-0 pb-2.5 pt-0">
+440-          <span className="text-white/40 group-hover:text-white/90 font-medium transition-all duration-[950ms] ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:-translate-y-0.5 flex items-center gap-1.5 w-full justify-center overflow-hidden text-[11.5px] px-2">
+441-            <ExternalLink size={11} className="opacity-40 group-hover:opacity-80 shrink-0 transition-opacity duration-[950ms] ease-[cubic-bezier(0.16,1,0.3,1)]" />
+442-            <span className="truncate block text-ellipsis break-all leading-none mt-0.5">
+443-              {portal.domain}
+444-            </span>
+445-          </span>
+446-        </div>
+447-      </div>
+448-    </motion.a>
+449-  );
+450-});
+451-
+452-export interface Section {
+453-  title: string;
+454-  portals: Portal[];
+455-}
+456-
+457-export const GlassySkeletonLoader = ({
+458-  count = 14,
+459-  type = "portal",
+460-  categoryType = "" }: {
+461-  count?: number;
+462-  type?: "portal" | "poster";
+463-  categoryType?: string;
+464-}) => {
+465:  return (
+466-    <>
+467-      {Array.from({ length: count }).map((_, idx) =>
+468-        type === "portal" ? (
+469-          <motion.div
+470-            key={`skel-portal-${idx}`}
+471-            initial={{ opacity: 0, y: 30 }}
+472-            animate={{ opacity: 1, y: 0 }}
+473-            transition={{ type: "spring", stiffness: 110, damping: 20, mass: 1, delay: idx * 0.04 }}
+474-            
+475-            className="search-result-modal rounded-3xl p-4 flex flex-col items-center justify-center text-center border border-white/5 relative overflow-hidden aspect-[2/1] min-h-[110px] md:min-h-[130px] transform-gpu shadow-[inset_0_1px_2px_rgba(255,255,255,0.02)] bg-[#0a0a0a]"
+476-          >
+477-            <div className="absolute inset-0 bg-white/[0.02]" />
+478-
+479-            {/* Framer Motion Shimmer */}
+480-            <motion.div
+481-              className="absolute inset-0 z-0 pointer-events-none bg-gradient-to-r from-transparent via-white/[0.06] to-transparent w-[200%]"
+482-              animate={{ x: ["-100%", "50%"] }}
+483-              transition={{
+484-                repeat: Infinity,
+485-                duration: 0.9,
+486-                ease: "linear",
+487-                delay: idx * 0.1 }}
+488-            />
+489-
+490-            <div className="w-[95%] h-[75%] mb-2 relative shrink-0 rounded-xl bg-white/[0.05] z-10 overflow-hidden shadow-inner" />
+491-
+492-            <div className="min-w-0 w-full flex flex-col items-center justify-center z-10">
+493-              <div className="h-3 sm:h-4 w-1/2 bg-white/[0.08] rounded-full shadow-inner" />
+494-            </div>
+495-          </motion.div>
+496-        ) : (
+497-          <motion.div
+498-            key={`skel-poster-${idx}`}
+499-            initial={{ opacity: 0, scale: 0.95 }}
+500-            animate={{ opacity: 1, scale: 1 }}
+501-            transition={{ type: "spring", stiffness: 110, damping: 20, mass: 1, delay: idx * 0.04 }}
+502-            
+503-            className={`w-full relative overflow-hidden rounded-3xl search-result-modal shadow-inner transform-gpu border border-white/10 ${
+504-              categoryType === "software" ||
+505-              categoryType === "system" ||
+506-              categoryType === "tool"
+507-                ? "h-48 sm:h-56 md:h-64"
+508-                : "aspect-[2/3]"
+509-            }`}
+510-          >
+511-            <div className="absolute inset-0 bg-white/[0.03]" />
+512-            <motion.div
+513-              className="absolute inset-0 z-0 pointer-events-none bg-gradient-to-r from-transparent via-white/[0.08] to-transparent w-[200%]"
+514-              animate={{ x: ["-100%", "50%"] }}
+515-              transition={{
+516-                repeat: Infinity,
+517-                duration: 0.9,
+518-                ease: "linear",
+519-                delay: idx * 0.1 }}
+520-            />
+521-
+522-            <div className="absolute inset-0 bg-gradient-to-t from-[#020205] via-[#020205]/40 to-transparent pointer-events-none opacity-90" />
+523-
+524-            <div className="absolute top-3 right-3 flex flex-col gap-1 items-end z-20 pointer-events-none">
+525-              <div className="h-4 bg-white/10 rounded border border-white/10 w-8" />
+526-              <div className="h-4 bg-white/10 rounded border border-white/10 w-12" />
+527-            </div>
+528-
+529-            <div className="absolute bottom-0 left-0 right-0 p-3 sm:p-5 pointer-events-none z-10 flex flex-col justify-end items-center text-center">
+530-              <div className="h-5 sm:h-6 bg-white/20 rounded-md w-3/4 mb-1" />
+531-              <div className="h-3 sm:h-4 bg-white/10 rounded-md w-1/2" />
+532-            </div>
+533-          </motion.div>
+534-        ),
+535-      )}
+536-    </>
+537-  );
+538-};
+539-
+540-// CSS-level Virtualization Wrapper
+541-export const VirtualGridItem = memo(({ children }: { children: React.ReactNode }) => {
+542-  const ref = React.useRef<HTMLDivElement>(null);
+543-  const isInView = useInView(ref, { once: true, margin: "200px" });
+544-
+545:  return (
+546-    <div 
+547-      ref={ref}
+548-      className="w-full aspect-[2/1] min-h-[120px] sm:min-h-[130px] md:min-h-[140px] will-change-[transform,opacity]"
+549-      style={{ contain: "layout style" }}
+550-    >
+551-      {isInView ? children : null}
+552-    </div>
+553-  );
+554-});
+555-
+556-export default function DirectoryLayout({
+557-  title,
+558-  subtitle,
+559-  description,
+560-  portals,
+561-  sections,
+562-  categoryId,
+563-  isLoading = false,
+564-  advisory = "SECURITY_ADVISORY: While our automated probes verify connection integrity, users are strictly advised to deploy advanced encryption layers and secure VPN protocols before establishing a direct data uplink to external nodes." }: {
+565-  title: string;
+566-  subtitle: string;
+567-  description: string;
+568-  portals?: Portal[];
+569-  sections?: Section[];
+570-  categoryId: string;
+571-  isLoading?: boolean;
+572-  advisory?: string;
+573-}) {
+574-  const [searchQuery, setSearchQuery] = useState("");
+575-  const [activeCategory, setActiveCategory] = useState<string>("all");
+576-  const [isScrolled, setIsScrolled] = useState(false);
+577-  const [isPending, startTransition] = useTransition();
+578-  const [isInputFocused, setIsInputFocused] = useState(false);
+579-  const [selectedPortal, setSelectedPortal] = useState<Portal | null>(null);
+580-
+581-  useEffect(() => {
+582-    const handleKey = (e: KeyboardEvent) => {
+583-      if (e.key === "Escape") setSelectedPortal(null);
+584-    };
+585-    window.addEventListener("keydown", handleKey);
+586:    return () => window.removeEventListener("keydown", handleKey);
+587-  }, []);
+588-
+589-  useEffect(() => {
+590-    // Lock scrolling on search input focus
+591-    if (isInputFocused) {
+592-      document.body.style.overflow = "hidden";
+593-    } else {
+594-      document.body.style.overflow = "";
+595-    }
+596:    return () => {
+597-      document.body.style.overflow = "";
+598-    };
+599-  }, [isInputFocused]);
+600-
+601-  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+602-
+603-  const handleSearchChange = useCallback(
+604-    (e: React.ChangeEvent<HTMLInputElement>) => {
+605-      const val = e.target.value;
+606-      if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
+607-      startTransition(() => {
+608-        searchTimeoutRef.current = setTimeout(() => {
+609-          setSearchQuery(val);
+610-        }, 150);
+611-      });
+612-    },
+613-    [],
+614-  );
+615-
+616-  const isScrolledRef = useRef(false);
+617-  useEffect(() => {
+618-    let ticking = false;
+619-    const handleScroll = () => {
+620-      if (!ticking) {
+621-        window.requestAnimationFrame(() => {
+622-          const scrolled = window.scrollY > 80;
+623-          if (scrolled !== isScrolledRef.current) {
+624-            isScrolledRef.current = scrolled;
+625-            setIsScrolled(scrolled);
+626-          }
+627-          ticking = false;
+628-        });
+629-        ticking = true;
+630-      }
+631-    };
+632-    window.addEventListener("scroll", handleScroll, { passive: true });
+633:    return () => window.removeEventListener("scroll", handleScroll);
+634-  }, []);
+635-
+636-  const [visibleCount, setVisibleCount] = useState(18);
+637-  const observerRef = useRef<IntersectionObserver | null>(null);
+638-
+639-  useEffect(() => {
+640-    setVisibleCount(18);
+641-  }, [searchQuery, activeCategory]);
+642-
+643-  const loadingRef = useCallback((node: HTMLDivElement | null) => {
+644-    if (observerRef.current) observerRef.current.disconnect();
+645-    observerRef.current = new IntersectionObserver(
+646-      (entries) => {
+647-        if (entries[0].isIntersecting) {
+648-          setVisibleCount((prev) => prev + 18);
+649-        }
+650-      },
+651-      { rootMargin: "400px" },
+652-    );
+653-    if (node) observerRef.current.observe(node);
+654-  }, []);
+655-
+656-  const Icon = ICON_MAP[categoryId] || Layers;
+657-
+658-  const rawDisplaySections: Section[] = useMemo(() => {
+659-    const isSearching = searchQuery.trim().length > 0;
+660-
+661-    // Deduplication logic tracking across all sections
+662-    const seenDomains = new Set<string>();
+663-    const seenNames = new Set<string>();
+664-
+665-    const filterDeduplicate = (portalsList: Portal[]) => {
+666-      return portalsList.filter((n) => {
+667-        const domainKey = n.domain
+668-          .replace(/^www\./, "")
+669-          .toLowerCase()
+670-          .trim();
+671-        const nameKey = n.name.toLowerCase().trim();
+672-        if (seenDomains.has(domainKey) || seenNames.has(nameKey)) return false;
+673-        seenDomains.add(domainKey);
+674-        seenNames.add(nameKey);
+675-
+676-        if (activeCategory !== "all") {
+677-          const rawType = (n.type || categoryId || "").toLowerCase();
+678-          let typeCategory = "system";
+679-          if (
+680-            rawType.includes("movie") ||
+681-            rawType.includes("stream") ||
+682-            rawType.includes("video")
+683-          )
+--
+793-      } else if (
+794-        rawType.includes("system") ||
+795-        rawType.includes("util") ||
+796-        rawType.includes("security")
+797-      ) {
+798-        groups["⚡️ System & Tools"].push(n);
+799-      } else {
+800-        groups["📁 Other"].push(n);
+801-      }
+802-    });
+803-
+804-    return Object.entries(groups)
+805-      .filter(([_, groupPortals]) => groupPortals.length > 0)
+806-      .map(([title, groupPortals]) => ({ title, portals: groupPortals }));
+807-  }, [sections, portals, searchQuery, activeCategory, categoryId]);
+808-
+809-  const displaySections = useMemo(() => {
+810-    let budget = visibleCount;
+811-    return rawDisplaySections
+812-      .map((section) => {
+813-        if (budget <= 0) return { ...section, portals: [] };
+814-        const slice = section.portals.slice(0, budget).map((portal) => {
+815-          let url = portal.url;
+816-          const query = searchQuery.trim();
+817-          if (query !== '') {
+818-            const strippedDomain = portal.domain.toLowerCase().replace(/^(https?:\/\/)?(www\.)?/, '').split('/')[0];
+819-            const provider = SEARCH_PROVIDERS.find(p => {
+820-              const pDomain = p.domain.toLowerCase().replace(/^(https?:\/\/)?(www\.)?/, '').split('/')[0];
+821-              return pDomain === strippedDomain || strippedDomain.includes(pDomain);
+822-            });
+823-            if (provider && provider.getSearchUrl) {
+824-              url = provider.getSearchUrl(query);
+825-            }
+826-          }
+827-          return { ...portal, url };
+828-        });
+829-        budget -= slice.length;
+830-        return { ...section, portals: slice };
+831-      })
+832-      .filter((s) => s.portals.length > 0);
+833-  }, [rawDisplaySections, visibleCount, searchQuery]);
+834-
+835-  const hasMorePortals = useMemo(() => {
+836-    const total = rawDisplaySections.reduce(
+837-      (acc, sec) => acc + sec.portals.length,
+838-      0,
+839-    );
+840-    return visibleCount < total;
+841-  }, [rawDisplaySections, visibleCount]);
+842-
+843:  return (
+844-    <div className="min-h-screen bg-transparent pt-8 md:pt-16 pb-10 px-2 md:px-4 relative">
+845-      {/* Subtle Stars for Subpages */}
+846-      <div className="absolute inset-0 opacity-10 pointer-events-none">
+847-        <div className="absolute top-1/3 left-1/4 w-0.5 h-0.5 bg-white rounded-full" />
+848-        <div className="absolute top-2/3 left-3/4 w-0.5 h-0.5 bg-white rounded-full" />
+849-        <div className="absolute top-1/2 left-1/2 w-0.5 h-0.5 bg-white rounded-full" />
+850-      </div>
+851-
+852-      <div className="w-[96%] max-w-[1800px] mx-auto px-1 sm:px-2 md:px-4 relative z-10">
+853-        <div className="flex flex-col lg:flex-row lg:items-center justify-between mb-8 md:mb-16 gap-8">
+854-          <div
+855-            className={`max-w-3xl text-center lg:text-left mx-auto lg:mx-0 transition-opacity duration-[950ms] ${isScrolled ? "opacity-0 pointer-events-none" : "opacity-100"}`}
+856-          >
+857-            <motion.div
+858-              initial={{ opacity: 0, y: 30 }}
+859-              animate={{ opacity: 1, y: 0 }}
+860-              className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-purple-500/10 border border-purple-500/20 text-purple-400 text-[10px] font-black uppercase tracking-widest mb-5 md:mb-7"
+861-            >
+862-              <Icon size={12} />
+863-              <span>Category: {subtitle}</span>
+864-            </motion.div>
+865-
+866-            <motion.h1
+867-              initial={{ opacity: 0, y: 30 }}
+868-              animate={{ opacity: 1, y: 0 }}
+869-              transition={{
+870-                type: "spring",
+871-                stiffness: 110, damping: 20, mass: 1 }}
+872-              
+873-              className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl xl:text-8xl font-black tracking-tightest text-slate-900 dark:text-white mb-5 md:mb-7 relative leading-[0.95] md:leading-[0.9] py-2 font-display uppercase"
+874-            >
+875-              <div className="text-gradient select-none">{title}</div>
+876-            </motion.h1>
+877-
+878-            <motion.p
+879-              initial={{ opacity: 0, y: 30 }}
+880-              animate={{ opacity: 1, y: 0 }}
+881-              transition={{
+882-                type: "spring",
+883-                stiffness: 110, damping: 20, mass: 1,
+884-                delay: 0.05 }}
+885-              
+886-              className="text-sm sm:text-base md:text-lg text-slate-600 dark:text-white/50 font-light leading-relaxed mb-0 max-w-2xl border-l-0 lg:border-l border-slate-900/10 dark:border-white/10 pl-0 lg:pl-8 text-center lg:text-left"
+887-            >
+888-              {description}
+889-            </motion.p>
+890-          </div>
+891-
+892-          <motion.div
+893-            initial={{ opacity: 0, y: 30 }}

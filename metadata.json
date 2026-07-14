@@ -1,0 +1,6 @@
+{
+  "name": "Web Universe - The Ultimate Resource Directory",
+  "description": "A comprehensive collection of useful web resources. Explore top-tier streaming portals, gaming platforms, digital libraries, tech tools, and informative directories in a modern, immersive interface.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
